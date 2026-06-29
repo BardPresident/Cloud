@@ -693,7 +693,14 @@ async function init() {
         if (window.EMBEDDED_MANIFEST) {
             manifest = window.EMBEDDED_MANIFEST;
         } else {
-            const res = await fetch(LIST_URL);
+            // Try local manifest first, then fall back to cloud.kkk.education
+            let res;
+            try {
+                res = await fetch('manifest.json');
+                if (!res.ok) throw new Error('local not found');
+            } catch(e) {
+                res = await fetch('https://cloud.kkk.education/manifest.json');
+            }
             if (!res.ok) throw new Error('HTTP ' + res.status);
             manifest = await res.json();
         }
@@ -708,7 +715,7 @@ async function init() {
             <div class="state-msg">
                 <span class="big">💀</span>
                 Could not load file list.<br><br>
-                Expected <code>manifest.json</code> at the same location as this page.<br>
+                Tried local <code>manifest.json</code> then <code>cloud.kkk.education/manifest.json</code>.<br>
                 <small style="font-size:13px;opacity:0.4;margin-top:14px;display:block;">${err.message}</small>
             </div>`;
     }
