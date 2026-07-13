@@ -585,7 +585,7 @@ function playFile(url, name, ext, rowEl, e) {
         openPlayerBar(name, vid);
     } else {
         // Audio
-        closeVideo();
+        stopVideoOverlay();
         audioEl.src = url;
         audioEl.play().catch(()=>{});
         openPlayerBar(name, audioEl);
@@ -641,15 +641,23 @@ document.getElementById('playerProgressWrap').addEventListener('click', function
 
 function closePlayer() {
     audioEl.pause();
-    closeVideo();
+    stopVideoOverlay();
+    activeMediaEl = null;
     document.getElementById('mediaPlayer').classList.remove('open');
     if (activeFileEl) { activeFileEl.classList.remove('now-playing'); activeFileEl = null; }
 }
 
-function closeVideo() {
+function stopVideoOverlay() {
     const vid = document.getElementById('videoEl');
     vid.pause(); vid.src = '';
     document.getElementById('videoOverlay').classList.remove('open');
+}
+
+function closeVideo() {
+    // User closed the video (X button or clicking outside) -- the file is done,
+    // so tear down the bottom player bar too instead of leaving it stuck open.
+    stopVideoOverlay();
+    closePlayer();
 }
 
 document.getElementById('videoOverlay').addEventListener('click', function(e) {
@@ -725,8 +733,10 @@ function buildIndex(manifest) {
     flatFiles = []; totalFiles = 0; totalDirs = 0;
     walkItems(manifest.items || []);
 }
+function isHidden(name) { return name.startsWith('.'); }
 function walkItems(items) {
     items.forEach(item => {
+        if (isHidden(item.name)) return;
         if (item.type === 'folder') { totalDirs++; walkItems(item.children || []); }
         else {
             const ext = extOf(item.name);
@@ -755,7 +765,7 @@ function formatSize(b) {
     return (b / 1073741824).toFixed(2) + ' GB';
 }
 function countItems(items) {
-    return items.reduce((c,i) => c + (i.type==='file' ? 1 : countItems(i.children||[])), 0);
+    return items.reduce((c,i) => isHidden(i.name) ? c : c + (i.type==='file' ? 1 : countItems(i.children||[])), 0);
 }
 function cleanName(n) { return n.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '); }
 function fmt(s) {
@@ -772,8 +782,9 @@ function renderTree() {
 }
 
 function renderItems(items, container, depth) {
-    const folders = items.filter(i => i.type === 'folder');
-    const files   = items.filter(i => i.type === 'file');
+    const visible = items.filter(i => !isHidden(i.name));
+    const folders = visible.filter(i => i.type === 'folder');
+    const files   = visible.filter(i => i.type === 'file');
 
     folders.forEach(item => {
         const count = countItems(item.children || []);
